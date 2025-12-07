@@ -293,6 +293,7 @@ with col1:
                 st.session_state.explanation_data = None
                 st.session_state.explanation = None
                 st.session_state.flowchart_code = None
+                st.session_state.analogy_text = None  # Clear analogy too
                 st.session_state.current_step = 0
                 # Force st_ace to refresh by incrementing version
                 if 'editor_version' not in st.session_state:
