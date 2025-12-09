@@ -6,8 +6,8 @@ import streamlit.components.v1 as components
 
 # Page Config
 st.set_page_config(
-    page_title="Python Syntax Explainer",
-    page_icon="🐍",
+    page_title="🔍 CODE LENS",
+    page_icon="�",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -24,7 +24,7 @@ def load_css():
         <style>
         /* Reduce top padding */
         .block-container {
-            padding-top: 2rem !important;
+            padding-top: 1rem !important;
         }
         
         /* Target the Previous Button (First column in the nav row) */
@@ -80,9 +80,326 @@ if "explanation" not in st.session_state:
 if "analogy_text" not in st.session_state:
     st.session_state.analogy_text = None
 
+# ============ HELPER FUNCTIONS FOR SECTION RENDERING ============
+import re as re_module
+
+def render_analysis_section(step_data):
+    """Render the Analysis section with variable substitution."""
+    explanation_text = step_data.get('explanation', '')
+    variables = step_data.get('variables', {})
+    
+    if variables:
+        for var_name, var_value in variables.items():
+            # Replace function calls like is_prime(var) with is_prime(actual_value)
+            for other_var, other_val in variables.items():
+                explanation_text = re_module.sub(
+                    rf'\b([a-zA-Z_][a-zA-Z0-9_]*)\({re_module.escape(other_var)}\)',
+                    rf'\1({other_val})',
+                    explanation_text
+                )
+            # Replace standalone variable names with var_name=value
+            explanation_text = re_module.sub(
+                rf'(?<![a-zA-Z0-9_\'">]){re_module.escape(var_name)}(?![a-zA-Z0-9_(<])',
+                f'{var_name}={var_value}',
+                explanation_text
+            )
+    
+    st.markdown(f"""
+    <div style='background-color: #1e1e1e; border: 1px solid #333; border-radius: 10px; padding: 10px; height: 200px; overflow-y: auto; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);'>
+        <h3 style='margin-top: 0; margin-bottom: 12px; font-size: 1rem; color: #fafafa;'>💡 LOGIC TRANSLATOR</h3>
+        {explanation_text}
+    </div>
+    """, unsafe_allow_html=True)
+
+
+def render_variables_section(step_data, prev_vars):
+    """Render the Variables section with memory block visualization."""
+    current_vars = step_data.get("variables", {})
+    
+    # Start the panel container with inline styles
+    panel_style = "background-color: #1e1e1e; border: 1px solid #333; border-radius: 10px; padding: 10px; height: 200px; overflow-y: auto; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);"
+    h3_style = "margin-top: 0; margin-bottom: 12px; font-size: 1rem; color: #fafafa;"
+    
+    if not current_vars:
+        st.markdown(f"<div style='{panel_style}'><h3 style='{h3_style}'>📊 CURRENT STATE</h3><p style='color: #888;'>No variables yet</p></div>", unsafe_allow_html=True)
+        return
+    
+    # CSS for Memory Blocks (injected once)
+    st.markdown("""
+    <style>
+    .memory-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 5px;
+    }
+    .memory-card {
+        background-color: #2d2d2d;
+        border: 1px solid #444;
+        border-radius: 6px;
+        padding: 8px;
+        min-width: 80px;
+        transition: all 0.3s ease;
+    }
+    .memory-card.changed {
+        border-color: #00c6ff;
+        box-shadow: 0 0 10px rgba(255, 75, 43, 0.3);
+    }
+    .memory-card.new {
+        border-color: #00c6ff;
+        box-shadow: 0 0 10px rgba(0, 198, 255, 0.3);
+    }
+    .var-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 4px;
+        border-bottom: 1px solid #444;
+        padding-bottom: 3px;
+    }
+    .var-name {
+        font-family: 'Fira Code', monospace;
+        font-weight: 600;
+        color: #fafafa;
+        font-size: 0.8rem;
+    }
+    .var-type {
+        font-size: 0.6rem;
+        color: #888;
+        background: #1e1e1e;
+        padding: 2px 4px;
+        border-radius: 3px;
+    }
+    .var-value {
+        font-family: 'Fira Code', monospace;
+        color: #a6e22e;
+        font-size: 0.85rem;
+        word-break: break-all;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Generate HTML for blocks inside panel
+    panel_style = "background-color: #1e1e1e; border: 1px solid #333; border-radius: 10px; padding: 10px; height: 200px; overflow-y: auto; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);"
+    h3_style = "margin-top: 0; margin-bottom: 12px; font-size: 1rem; color: #fafafa;"
+    blocks_html = f"<div style='{panel_style}'><h3 style='{h3_style}'>📊 CURRENT STATE</h3><div class='memory-container'>"
+    
+    for var_name, var_value in current_vars.items():
+        status_class = ""
+        if var_name not in prev_vars:
+            status_class = "new"
+        elif str(prev_vars[var_name]) != str(var_value):
+            status_class = "changed"
+        
+        type_label = "var"
+        display_value = str(var_value)
+        
+        if display_value.startswith('[') and display_value.endswith(']'):
+            type_label = "list"
+        elif display_value.startswith('{') and display_value.endswith('}'):
+            type_label = "dict"
+        elif display_value.isdigit():
+            type_label = "int"
+        elif display_value.replace('.', '', 1).isdigit():
+            type_label = "float"
+        elif display_value.startswith("'") or display_value.startswith('"'):
+            type_label = "str"
+        
+        blocks_html += f"""
+<div class="memory-card {status_class}">
+<div class="var-header">
+    <span class="var-name">{var_name}</span>
+    <span class="var-type">{type_label}</span>
+</div>
+<div class="var-value">{display_value}</div>
+</div>
+"""
+    
+    blocks_html += '</div></div>'  # Close memory-container and top-panel
+    st.markdown(blocks_html, unsafe_allow_html=True)
+
+
+def render_output_section(current_idx):
+    """Render the Program Output section."""
+    final_output = ""
+    for i in range(current_idx + 1):
+        output = st.session_state.explanation_data[i].get("output", "")
+        if output:
+            final_output = output
+    
+    panel_style = "background-color: #1e1e1e; border: 1px solid #333; border-radius: 10px; padding: 10px; height: 200px; overflow-y: auto; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);"
+    h3_style = "margin-top: 0; margin-bottom: 12px; font-size: 1rem; color: #fafafa;"
+    output_html = f"<div style='{panel_style}'><h3 style='{h3_style}'>🖥️ EXECUTION RESULT</h3>"
+    if final_output:
+        # Filter out input prompts
+        final_output = re_module.sub(r'Enter[^:]*:\s*', '', final_output)
+        final_output = final_output.strip()
+        output_html += f"<pre style='background: #2d2d2d; padding: 10px; border-radius: 5px; color: #a6e22e; font-family: monospace; margin: 0; overflow-x: auto;'>{final_output}</pre>"
+    else:
+        output_html += "<p style='color: #888;'>No output yet</p>"
+    output_html += "</div>"
+    return output_html  # Return HTML instead of rendering
+
+
+def render_middle_row(step_data, prev_vars, current_idx):
+    """Render all 3 middle row panels in a single CSS grid block for equal heights."""
+    
+    # Common styles
+    panel_style = "background-color: #1e1e1e; border: 1px solid #333; border-radius: 10px; padding: 10px; height: 200px; overflow-y: auto; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);"
+    h3_style = "margin-top: 0; margin-bottom: 12px; font-size: 1rem; color: #fafafa;"
+    
+    # === PANEL 1: LOGIC TRANSLATOR ===
+    explanation_text = step_data.get('explanation', '')
+    variables = step_data.get('variables', {})
+    
+    if variables:
+        for var_name, var_value in variables.items():
+            for other_var, other_val in variables.items():
+                explanation_text = re_module.sub(
+                    rf'\b([a-zA-Z_][a-zA-Z0-9_]*)\({re_module.escape(other_var)}\)',
+                    rf'\1({other_val})',
+                    explanation_text
+                )
+            explanation_text = re_module.sub(
+                rf'(?<![a-zA-Z0-9_\'">]){re_module.escape(var_name)}(?![a-zA-Z0-9_(<])',
+                f'{var_name}={var_value}',
+                explanation_text
+            )
+    
+    panel1_html = f"""<div style='{panel_style}'>
+        <h3 style='{h3_style}'>💡 LOGIC TRANSLATOR</h3>
+        {explanation_text}
+    </div>"""
+    
+    # === PANEL 2: CURRENT STATE ===
+    current_vars = step_data.get("variables", {})
+    
+    if not current_vars:
+        panel2_html = f"<div style='{panel_style}'><h3 style='{h3_style}'>📊 CURRENT STATE</h3><p style='color: #888;'>No variables yet</p></div>"
+    else:
+        # Build variable cards
+        var_cards = ""
+        for var_name, var_value in current_vars.items():
+            status_class = ""
+            border_color = "#444"
+            if var_name not in prev_vars:
+                border_color = "#00c6ff"
+            elif str(prev_vars[var_name]) != str(var_value):
+                border_color = "#00c6ff"
+            
+            display_value = str(var_value)
+            type_label = "var"
+            if display_value.startswith('[') and display_value.endswith(']'):
+                type_label = "list"
+            elif display_value.startswith('{') and display_value.endswith('}'):
+                type_label = "dict"
+            elif display_value.isdigit():
+                type_label = "int"
+            elif display_value.replace('.', '', 1).isdigit():
+                type_label = "float"
+            elif display_value.startswith("'") or display_value.startswith('"'):
+                type_label = "str"
+            
+            var_cards += f"""<div style='background-color: #2d2d2d; border: 1px solid {border_color}; border-radius: 6px; padding: 8px; min-width: 80px; display: inline-block; margin-right: 8px; margin-bottom: 8px;'>
+                <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; border-bottom: 1px solid #444; padding-bottom: 3px;'>
+                    <span style='font-family: monospace; font-weight: 600; color: #fafafa; font-size: 0.8rem;'>{var_name}</span>
+                    <span style='font-size: 0.6rem; color: #888; background: #1e1e1e; padding: 2px 4px; border-radius: 3px;'>{type_label}</span>
+                </div>
+                <div style='font-family: monospace; color: #a6e22e; font-size: 0.85rem;'>{display_value}</div>
+            </div>"""
+        
+        panel2_html = f"<div style='{panel_style}'><h3 style='{h3_style}'>📊 CURRENT STATE</h3>{var_cards}</div>"
+    
+    # === PANEL 3: EXECUTION RESULT ===
+    final_output = ""
+    for i in range(current_idx + 1):
+        output = st.session_state.explanation_data[i].get("output", "")
+        if output:
+            final_output = output
+    
+    if final_output:
+        final_output = re_module.sub(r'Enter[^:]*:\s*', '', final_output)
+        final_output = final_output.strip()
+        output_content = f"<pre style='background: #2d2d2d; padding: 10px; border-radius: 5px; color: #a6e22e; font-family: monospace; margin: 0; overflow-x: auto;'>{final_output}</pre>"
+    else:
+        output_content = "<p style='color: #888;'>No output yet</p>"
+    
+    panel3_html = f"<div style='{panel_style}'><h3 style='{h3_style}'>🖥️ EXECUTION RESULT</h3>{output_content}</div>"
+    
+    # === COMBINE ALL 3 PANELS IN CSS GRID ===
+    grid_html = f"""
+    <div style='display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; align-items: stretch;'>
+        {panel1_html}
+        {panel2_html}
+        {panel3_html}
+    </div>
+    """
+    
+    st.markdown(grid_html, unsafe_allow_html=True)
+
+
+def render_step_navigation(current_idx, total_steps):
+    """Render the Step Navigation as a horizontal strip."""
+    
+    # Callback functions for buttons
+    def go_prev():
+        if st.session_state.current_step > 0:
+            st.session_state.current_step -= 1
+            st.session_state.nav_slider = st.session_state.current_step + 1
+    
+    def go_next():
+        if st.session_state.current_step < total_steps - 1:
+            st.session_state.current_step += 1
+            st.session_state.nav_slider = st.session_state.current_step + 1
+    
+    # Callback for slider - reads from widget key
+    def on_slider_change():
+        st.session_state.current_step = st.session_state.nav_slider - 1
+    
+    # Add spacing before step navigator
+    st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
+    
+    # Horizontal layout: Label | Prev | Slider | Next
+    nav_col1, nav_col2, nav_col3, nav_col4 = st.columns([2, 1, 5, 1])
+    
+    with nav_col1:
+        st.markdown(f"""
+        <div style='display: flex; align-items: center; height: 40px;'>
+            <span style='font-size: 1.1rem; color: #888; font-weight: bold;'>🎯 STEP NAVIGATOR</span>
+            <span style='margin-left: 10px; font-size: 1.5rem; color: #fafafa; font-weight: bold;'>{current_idx + 1}</span>
+            <span style='color: #666; font-size: 1.1rem;'> / {total_steps}</span>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with nav_col2:
+        # Prev button with callback
+        st.markdown("<span id='button-marker-prev'></span>", unsafe_allow_html=True)
+        st.button("← Prev", disabled=(current_idx == 0), use_container_width=True, key="nav_prev", on_click=go_prev)
+    
+    with nav_col3:
+        # Slider controlled via session state - no value parameter
+        if total_steps > 1:
+            # Initialize nav_slider in session state if not present
+            if "nav_slider" not in st.session_state:
+                st.session_state.nav_slider = current_idx + 1
+            st.slider(
+                "Step",
+                min_value=1,
+                max_value=total_steps,
+                label_visibility="collapsed",
+                key="nav_slider",
+                on_change=on_slider_change
+            )
+    
+    with nav_col4:
+        # Next button with callback
+        st.markdown("<span id='button-marker-next'></span>", unsafe_allow_html=True)
+        st.button("Next →", disabled=(current_idx >= total_steps - 1), use_container_width=True, key="nav_next", on_click=go_next)
+
+
 # Title - Hide when in debug mode (centered at top)
 if not st.session_state.explanation_data:
-    st.markdown("<h1 style='text-align: center;'>🐍 Python Syntax Explainer</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center;'><span class='emoji-fix'>🔍</span> CODE LENS</h1>", unsafe_allow_html=True)
 
 
 # Sidebar Configuration
@@ -139,11 +456,43 @@ if st.session_state.explanation_data:
 is_debug_mode = st.session_state.explanation_data is not None
 
 if is_debug_mode:
-    # Debug mode: 3 columns - Code Input | Step Navigation | Flowchart
-    col1, col_nav, col2 = st.columns([4, 2, 4])
+    # ============ NEW 3-ROW DEBUGGER LAYOUT ============
+    current_idx = st.session_state.current_step
+    step_data = st.session_state.explanation_data[current_idx]
+    
+    # Get previous variables for diffing
+    prev_vars = {}
+    if current_idx > 0:
+        prev_vars = st.session_state.explanation_data[current_idx - 1].get("variables", {})
+    
+    total_steps = len(st.session_state.explanation_data)
+    
+    # ROW 1: CODE | LOGIC MAP (2 columns)
+    col1, col2 = st.columns(2)
+    # col1 = Code (handled below with col1)
+    # col2 = Flowchart (handled below with col2)
+    
+    # ROW 2: LOGIC TRANSLATOR | CURRENT STATE | EXECUTION RESULT (CSS Grid for equal heights)
+    render_middle_row(step_data, prev_vars, current_idx)
+    
+    # ROW 3: STEP NAVIGATOR (full width)
+    render_step_navigation(current_idx, total_steps)
+    
+    # ROW 4: STOP DEBUGGER BUTTON (centered)
+    st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
+    stop_col1, stop_col2, stop_col3 = st.columns([2, 1, 2])
+    with stop_col2:
+        if st.button("🛑 Stop Debugger", type="primary", use_container_width=True):
+            st.session_state.explanation_data = None
+            st.session_state.current_step = 0
+            st.rerun()
+    
+    col_center = None
+    col_nav = None
 else:
     # Main screen: 2 wider columns - Code Input | Analogy
     col1, col2 = st.columns([1, 1])
+    col_center = None
     col_nav = None  # No navigation column on main screen
 
 
@@ -181,7 +530,7 @@ def extract_input_prompts(code):
     return prompts
 
 with col1:
-    st.subheader("📝 Code Input")
+    st.subheader("📝 CODE")
     
     # Toggle between Edit and Debug mode
     # If explanation data exists, we are in "Debug Mode" (unless user clears)
@@ -208,14 +557,14 @@ with col1:
                 lines[line_no - 1] = lines[line_no - 1].rstrip() + f"  # {var_text}"
             
             # Add red arrow at the beginning of the active line
-            lines[line_no - 1] = "🔴 ➜ " + lines[line_no - 1]
+            lines[line_no - 1] = "🔷 ➜ " + lines[line_no - 1]
                 
         code_to_display = '\n'.join(lines)
         
         
         # Display code with st.code (has built-in syntax highlighting)
 
-        st.code(code_to_display, language="python", line_numbers=True, height=650)
+        st.code(code_to_display, language="python", line_numbers=True, height=550)
             
     else:
         # --- EDIT MODE (st_ace) ---
@@ -263,7 +612,7 @@ with col1:
         btn_col1, btn_col2 = st.columns([1, 3])
         with btn_col1:
             st.markdown('<span id="button-marker-explain"></span>', unsafe_allow_html=True)
-            if st.button("Explain Syntax", use_container_width=True):
+            if st.button("🔓 DECODE LOGIC", use_container_width=True):
                 if not code_input.strip():
                     st.warning("Please enter some code first.")
                 else:
@@ -288,7 +637,7 @@ with col1:
 
         with btn_col2:
             st.markdown('<span id="button-marker-clear"></span>', unsafe_allow_html=True)
-            if st.button("Clear Code", use_container_width=True):
+            if st.button("🔄 RESET", use_container_width=True):
                 st.session_state.code_input = ""
                 st.session_state.explanation_data = None
                 st.session_state.explanation = None
@@ -304,7 +653,7 @@ with col1:
 
         st.markdown("---")
         st.markdown('<span id="button-marker-analogy"></span>', unsafe_allow_html=True)
-        if st.button("🌟 Explain with Analogy", use_container_width=True):
+        if st.button("🌟 Conceptualize", use_container_width=True):
             if not code_input.strip():
                 st.warning("Please enter some code first.")
             else:
@@ -316,66 +665,7 @@ with col1:
                         st.session_state.analogy_text = analogy
                         st.rerun()
 
-# ============ CENTER COLUMN: STEP NAVIGATION (Debug mode only) ============
-if col_nav is not None:
-    with col_nav:
-        # Add vertical spacing to center content (match code input height)
-        st.markdown("<div style='height: 200px;'></div>", unsafe_allow_html=True)
-        
-        if st.session_state.explanation_data:
-            total_steps = len(st.session_state.explanation_data)
-            current_idx = st.session_state.current_step
-            
-            st.markdown("""
-            <div style='text-align: center; margin-bottom: 15px;'>
-                <h4 style='color: #888; margin: 0;'>🎯 Step Navigation</h4>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # Navigation buttons in a centered container
-            btn_col1, btn_col2 = st.columns(2)
-            
-            with btn_col1:
-                st.markdown("<span id='button-marker-prev'></span>", unsafe_allow_html=True)
-                prev_clicked = st.button("← Prev", disabled=(current_idx == 0), use_container_width=True)
-            
-            with btn_col2:
-                st.markdown("<span id='button-marker-next'></span>", unsafe_allow_html=True)
-                next_clicked = st.button("Next →", disabled=(current_idx >= total_steps - 1), use_container_width=True)
-            
-            # Handle button clicks
-            if prev_clicked and current_idx > 0:
-                st.session_state.current_step = current_idx - 1
-                st.rerun()
-            
-            if next_clicked and current_idx < total_steps - 1:
-                st.session_state.current_step = current_idx + 1
-                st.rerun()
-            
-            # Slider
-            if total_steps > 1:
-                selected_step = st.slider(
-                    "Step",
-                    min_value=1,
-                    max_value=total_steps,
-                    value=current_idx + 1,
-                    label_visibility="collapsed"
-                )
-                if selected_step - 1 != current_idx:
-                    st.session_state.current_step = selected_step - 1
-                    st.rerun()
-            
-            st.markdown(f"<div style='text-align: center; color: #888; font-size: 14px; margin-top: 5px;'>Step {current_idx + 1} of {total_steps}</div>", unsafe_allow_html=True)
-            
-            # Add vertical spacing to push button to bottom
-            st.markdown("<div style='height: 280px;'></div>", unsafe_allow_html=True)
-            
-            # Stop Debugging button at bottom of center column
-            st.markdown("<span id='button-marker-stop'></span>", unsafe_allow_html=True)
-            if st.button("Stop Debugging / Edit Code", use_container_width=True):
-                st.session_state.explanation_data = None
-                st.session_state.current_step = 0
-                st.rerun()
+
 
 
 with col2:
@@ -394,7 +684,7 @@ with col2:
         
         # ============ FLOWCHART CONTAINER (Mermaid.js) ============
         with st.container():
-            st.markdown("### 🗺️ Flowchart")
+            st.markdown("### 🗺️ LOGIC MAP")
             
             # Generate deterministic flowchart from AST
             import flowchart_generator
@@ -505,9 +795,12 @@ with col2:
                         rx: 5px !important;
                     }}
                     .nodeLabel {{
-                        padding: 10px 15px !important;
-                        font-size: 13px !important;
+                        padding: 8px 12px !important;
+                        font-size: 11px !important;
                         white-space: normal !important;
+                        word-wrap: break-word !important;
+                        overflow: visible !important;
+                        max-width: none !important;
                         text-align: center !important;
                     }}
                     .label {{
@@ -546,33 +839,34 @@ with col2:
                     // Initialize Mermaid with improved config
                     mermaid.initialize({{
                         startOnLoad: true,
-                        theme: 'dark',
+                        theme: 'neutral',
                         flowchart: {{
                             curve: 'linear',
                             padding: 10,
                             nodeSpacing: 30,
                             rankSpacing: 40,
                             htmlLabels: true,
-                            useMaxWidth: false,
-                            wrappingWidth: 150
+                            useMaxWidth: true,
+                            wrappingWidth: 300
                         }},
 
 
                         themeVariables: {{
                             fontFamily: 'Inter, Segoe UI, sans-serif',
-                            fontSize: '13px',
-                            primaryColor: '#2d2d2d',
-                            primaryTextColor: '#fff',
-                            primaryBorderColor: '#555',
-                            lineColor: '#50E3C2',
-                            secondaryColor: '#1e1e1e',
-                            tertiaryColor: '#1e1e1e',
-                            nodeBorder: '#555',
-                            clusterBkg: '#1e1e1e'
+                            fontSize: '12px',
+                            primaryColor: '#444444',
+                            primaryTextColor: '#ffffff',
+                            primaryBorderColor: '#666666',
+                            lineColor: '#888888',
+                            secondaryColor: '#333333',
+                            tertiaryColor: '#333333',
+                            nodeBorder: '#666666',
+                            clusterBkg: '#2d2d2d',
+                            edgeLabelBackground: '#1e1e1e'
                         }}
                     }});
                     
-                    // Zoom controls - start at 1.0 for natural fit
+                    // Zoom controls - start at 1.0 (native size)
                     let currentScale = 1.0;
                     const scaleStep = 0.1;
                     const minScale = 0.5;
@@ -587,10 +881,7 @@ with col2:
                         }}
                     }}
                     
-                    // Apply initial scale after page loads
-                    setTimeout(function() {{
-                        updateTransform();
-                    }}, 100);
+                    // No fade-in needed - diagram visible immediately
                     
                     document.getElementById('zoom-in-btn').addEventListener('click', function() {{
                         if (currentScale < maxScale) {{
@@ -626,11 +917,27 @@ with col2:
                             // Find the active node in the SVG (Mermaid prefixes with flowchart-)
                             const activeNode = document.querySelector('[id*="' + activeNodeId + '"]');
                             if (activeNode) {{
-                                activeNode.scrollIntoView({{
-                                    behavior: 'smooth',
-                                    block: 'center',
-                                    inline: 'center'
-                                }});
+                                // Use container scrollTop instead of scrollIntoView to avoid scrolling main window
+                                const container = document.getElementById('flowchart-container');
+                                if (container && activeNode.getBoundingClientRect) {{
+                                    const wrapper = document.getElementById('mermaid-wrapper');
+                                    if (wrapper) {{
+                                        // Get active node position relative to wrapper
+                                        const nodeRect = activeNode.getBoundingClientRect();
+                                        const wrapperRect = wrapper.getBoundingClientRect();
+                                        const containerRect = container.getBoundingClientRect();
+                                        
+                                        // Calculate scroll position to center the node
+                                        const scrollTop = (nodeRect.top - wrapperRect.top) - (container.clientHeight / 2) + (nodeRect.height / 2);
+                                        const scrollLeft = (nodeRect.left - wrapperRect.left) - (container.clientWidth / 2) + (nodeRect.width / 2);
+                                        
+                                        container.scrollTo({{
+                                            top: Math.max(0, scrollTop),
+                                            left: Math.max(0, scrollLeft),
+                                            behavior: 'smooth'
+                                        }});
+                                    }}
+                                }}
                             }}
                         }}
                     }}, 800);
@@ -639,211 +946,4 @@ with col2:
             </body>
             </html>
             """
-            components.html(html_code, height=650)
-
-
-# ============ BOTTOM SECTION: Analysis & Variables ============
-if st.session_state.explanation_data:
-    st.markdown("---")
-    # Reduced left column width to keep Analysis to the left of center
-    bottom_col1, bottom_col2 = st.columns([4, 5])
-    
-    # BOTTOM LEFT: Analysis
-    with bottom_col1:
-        current_idx = st.session_state.current_step
-        step_data = st.session_state.explanation_data[current_idx]
-        
-        # Get the explanation text
-        explanation_text = step_data.get('explanation', '')
-        
-        # Substitute variable values in the explanation
-        variables = step_data.get('variables', {})
-        if variables:
-            import re
-            for var_name, var_value in variables.items():
-                # Replace function calls like is_prime(var) with is_prime(actual_value)
-                # Pattern: function_name(variable_name) -> function_name(value)
-                for other_var, other_val in variables.items():
-                    explanation_text = re.sub(
-                        rf'\b([a-zA-Z_][a-zA-Z0-9_]*)\({re.escape(other_var)}\)',
-                        rf'\1({other_val})',
-                        explanation_text
-                    )
-                # Replace standalone variable names (not in HTML tags) with var_name=value
-                explanation_text = re.sub(
-                    rf'(?<![a-zA-Z0-9_\'">]){re.escape(var_name)}(?![a-zA-Z0-9_(<=])',
-                    f'{var_name}={var_value}',
-                    explanation_text
-                )
-        
-        # Fixed height with scroll
-        st.markdown(f"""
-        <div class='explanation-card' style='height: 300px; overflow-y: auto;'>
-            <h3>💡 Analysis</h3>
-            {explanation_text}
-        </div>
-        """, unsafe_allow_html=True)
-
-
-    # BOTTOM RIGHT: Variables
-    with bottom_col2:
-        # Variables State - Table View
-        current_idx = st.session_state.current_step # Redefine current_idx for this scope
-        step_data = st.session_state.explanation_data[current_idx] # Redefine step_data for this scope
-        if step_data.get("variables"):
-            st.markdown("### 📊 Variables")
-            
-            # Get previous variables for diffing
-            prev_vars = {}
-            if current_idx > 0:
-                prev_vars = st.session_state.explanation_data[current_idx - 1].get("variables", {})
-            
-            current_vars = step_data["variables"]
-                        # CSS for Memory Blocks
-            st.markdown("""
-            <style>
-            .memory-container {
-                display: flex;
-                flex-wrap: wrap;
-                gap: 12px;
-                margin-top: 10px;
-            }
-            .memory-card {
-                background-color: #1e1e1e;
-                border: 1px solid #333;
-                border-radius: 8px;
-                padding: 12px;
-                min-width: 120px;
-                position: relative;
-                transition: all 0.3s ease;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-            }
-            .memory-card.changed {
-                border-color: #FF4B2B;
-                box-shadow: 0 0 15px rgba(255, 75, 43, 0.2);
-                animation: pulse 1.5s infinite;
-            }
-            .memory-card.new {
-                border-color: #00c6ff;
-                box-shadow: 0 0 15px rgba(0, 198, 255, 0.2);
-            }
-            @keyframes pulse {
-                0% { box-shadow: 0 0 0 0 rgba(255, 75, 43, 0.4); }
-                70% { box-shadow: 0 0 0 10px rgba(255, 75, 43, 0); }
-                100% { box-shadow: 0 0 0 0 rgba(255, 75, 43, 0); }
-            }
-            .var-header {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                margin-bottom: 8px;
-                border-bottom: 1px solid #333;
-                padding-bottom: 4px;
-            }
-            .var-name {
-                font-family: 'Fira Code', monospace;
-                font-weight: 600;
-                color: #fafafa;
-                font-size: 0.9rem;
-            }
-            .var-type {
-                font-size: 0.7rem;
-                color: #888;
-                background: #2d2d2d;
-                padding: 2px 6px;
-                border-radius: 4px;
-            }
-            .var-value {
-                font-family: 'Fira Code', monospace;
-                color: #a6e22e;
-                font-size: 1rem;
-                word-break: break-all;
-            }
-            .list-container {
-                display: flex;
-                gap: 4px;
-                overflow-x: auto;
-                padding-bottom: 4px;
-            }
-            .list-item {
-                background: #2d2d2d;
-                padding: 4px 8px;
-                border-radius: 4px;
-                font-size: 0.9rem;
-                border: 1px solid #444;
-            }
-            </style>
-            """, unsafe_allow_html=True)
-            
-            # Generate HTML for blocks
-            blocks_html = '<div class="memory-container">'
-            
-            for var_name, var_value in current_vars.items():
-                # Determine status
-                status_class = ""
-                if var_name not in prev_vars:
-                    status_class = "new"
-                elif str(prev_vars[var_name]) != str(var_value):
-                    status_class = "changed"
-                
-                # Determine type label
-                # Since we only have string representation from backend, we infer or just use generic
-                # But we can try to parse simple types for display
-                type_label = "variable"
-                display_value = str(var_value)
-                
-                # Custom rendering for lists (simple heuristic)
-                value_html = f'<div class="var-value">{display_value}</div>'
-                if display_value.startswith('[') and display_value.endswith(']'):
-                    type_label = "list"
-                    try:
-                        # Safe-ish parsing for display
-                        import ast
-                        items = ast.literal_eval(display_value)
-                        if isinstance(items, list):
-                            value_html = '<div class="list-container">'
-                            for item in items:
-                                value_html += f'<div class="list-item">{item}</div>'
-                            value_html += '</div>'
-                    except:
-                        pass # Fallback to string
-                elif display_value.startswith('{') and display_value.endswith('}'):
-                    type_label = "dict"
-                elif display_value.isdigit():
-                    type_label = "int"
-                elif display_value.replace('.', '', 1).isdigit():
-                    type_label = "float"
-                elif display_value.startswith("'") or display_value.startswith('"'):
-                    type_label = "str"
-                
-                blocks_html += f"""
-<div class="memory-card {status_class}">
-<div class="var-header">
-    <span class="var-name">{var_name}</span>
-    <span class="var-type">{type_label}</span>
-</div>
-{value_html}
-</div>
-"""
-            
-            blocks_html += '</div>'
-            st.markdown(blocks_html, unsafe_allow_html=True)
-        
-        # Program Output Box
-        # Show only the final output (last non-empty output)
-        final_output = ""
-        for i in range(current_idx + 1):
-            output = st.session_state.explanation_data[i].get("output", "")
-            if output:
-                final_output = output
-        
-        if final_output:
-            # Filter out input prompts like "Enter an integer:"
-            import re
-            # Remove common input prompts
-            final_output = re.sub(r'Enter[^:]*:\s*', '', final_output)
-            final_output = final_output.strip()
-            
-            st.markdown("### 🖥️ Program Output")
-            st.code(final_output, language="text")
-
+            components.html(html_code, height=550)

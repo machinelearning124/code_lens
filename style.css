@@ -127,6 +127,13 @@ h1 {
     letter-spacing: -1px;
 }
 
+h1 .emoji-fix {
+    background: none !important;
+    -webkit-text-fill-color: initial !important;
+    color: inherit !important;
+    font-weight: normal !important;
+}
+
 /* Card-like container for explanation */
 .explanation-card {
     background-color: #1e1e1e;
@@ -135,4 +142,54 @@ h1 {
     padding: 20px;
     margin-top: 20px;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Unified Top Panel Styling - for panels in middle row */
+.top-panel {
+    background-color: #1e1e1e;
+    border: 1px solid #333;
+    border-radius: 10px;
+    padding: 10px;
+    height: 200px !important;
+    min-height: 200px !important;
+    max-height: 200px !important;
+    overflow-y: auto !important;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    margin-bottom: 6px;
+}
+
+.top-panel h3 {
+    margin-top: 0;
+    margin-bottom: 12px;
+    font-size: 1rem;
+    color: #fafafa;
+}
+
+.top-panel h4 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    font-size: 0.95rem;
+    color: #888;
+    text-align: center;
+}
+
+/* Slider labels always visible - comprehensive selectors */
+div[data-baseweb="slider"]>div:first-child,
+div[data-baseweb="slider"]>div:last-child,
+[data-testid="stSlider"]>div>div>div,
+[data-testid="stSlider"] [data-testid="stTickBarMin"],
+[data-testid="stSlider"] [data-testid="stTickBarMax"],
+.stSlider div[data-baseweb="slider"] div {
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+/* Equal height columns - force flexbox stretch */
+[data-testid="column"] {
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+[data-testid="column"]>div:first-child {
+    flex: 1 !important;
 }

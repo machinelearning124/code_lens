@@ -537,23 +537,15 @@ def flowchart_to_mermaid(flowchart_data: Dict[str, Any], active_line: int = 0, v
     lines.append("")
     lines.append("    %% Inline styles")
     
-    # Style all nodes with default colors first
+    # Style all nodes with uniform gray (neutral)
     for node in flowchart_data.get("nodes", []):
         node_id = node["id"]
-        node_type = node.get("type", "operation")
-        
-        if node_type == "condition":
-            lines.append(f'    style {node_id} fill:#F5A623,stroke:#C77F1B,color:#fff')
-        elif node_type == "io":
-            lines.append(f'    style {node_id} fill:#4A90E2,stroke:#2E5C8A,color:#fff')
-        elif node_type in ("start", "end"):
-            lines.append(f'    style {node_id} fill:#50E3C2,stroke:#2DA87F,color:#000')
-        else:
-            lines.append(f'    style {node_id} fill:#2d2d2d,stroke:#555,color:#fff')
+        # All nodes get the same neutral gray style
+        lines.append(f'    style {node_id} fill:#3a3a3a,stroke:#666,color:#fff')
     
     # Override active node with red highlight (LAST so it takes precedence)
     if active_node_id:
-        lines.append(f'    style {active_node_id} fill:#FF4B2B,stroke:#FF416C,color:#fff,stroke-width:4px')
+        lines.append(f'    style {active_node_id} fill:#00c6ff,stroke:#0072ff,color:#000,stroke-width:4px')
     
     return "\n".join(lines)
 
