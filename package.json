@@ -1,0 +1,48 @@
+{
+  "name": "code-lens",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "postinstall": "copy node_modules\\web-tree-sitter\\tree-sitter.wasm public\\ && copy node_modules\\tree-sitter-python\\tree-sitter-python.wasm public\\"
+  },
+  "dependencies": {
+    "@google/genai": "^1.33.0",
+    "@kriss-u/py-ast": "npm:@jsr/kriss-u__py-ast@^1.9.0",
+    "@monaco-editor/react": "^4.7.0",
+    "antlr4ng": "^3.0.16",
+    "dt-sql-parser": "^4.4.0",
+    "esprima": "^4.0.1",
+    "mermaid": "^11.12.2",
+    "monaco-editor": "^0.55.1",
+    "node-sql-parser": "^5.3.13",
+    "prismjs": "^1.30.0",
+    "pyodide": "^0.29.0",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "react-simple-code-editor": "^0.14.1",
+    "tree-sitter-c-sharp": "^0.23.1",
+    "tree-sitter-java": "^0.23.5",
+    "tree-sitter-javascript": "^0.25.0",
+    "tree-sitter-python": "^0.25.0",
+    "tree-sitter-wasms": "^0.1.13",
+    "web-tree-sitter": "^0.26.3"
+  },
+  "devDependencies": {
+    "@types/esprima": "^4.0.6",
+    "@types/node": "^22.14.0",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^4.3.1",
+    "antlr-ng": "^1.0.10",
+    "antlr4ng-cli": "^1.0.7",
+    "autoprefixer": "^10.4.23",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.17",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0"
+  }
+}

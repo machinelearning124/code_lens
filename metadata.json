@@ -1,0 +1,5 @@
+{
+  "name": "Code Lens",
+  "description": "A Power-BI style React application for summarizing, decoding, translating, and optimizing code using the Gemini API.",
+  "requestFramePermissions": []
+}

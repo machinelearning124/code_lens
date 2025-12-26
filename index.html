@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Code Lens</title>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script>
+    // Safe-guard for Emscripten/Web-Tree-Sitter environment detection
+    window.process = window.process || {};
+    window.process.env = window.process.env || {};
+    window.process.versions = window.process.versions || {}; 
+  </script>
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      overflow: hidden;
+      /* Prevent scrollbars from background blobs */
+    }
+
+    /* ===== AURORA BACKGROUND ENGINE ===== */
+    .bg-aurora {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: -50;
+      background-color: #F8F9FF;
+      overflow: hidden;
+      transition: background-color 0.5s ease;
+    }
+
+    .dark .bg-aurora {
+      background-color: #050510;
+    }
+
+    /* The glowing orbs */
+    .aurora-blob {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.6;
+      animation: blob 20s infinite alternate cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .dark .aurora-blob {
+      opacity: 0.4;
+      filter: blur(100px);
+    }
+
+    /* Blob Colors & Positions */
+    .blob-1 {
+      top: -10%;
+      left: -10%;
+      width: 50vw;
+      height: 50vw;
+      background: #a78bfa;
+      animation-delay: 0s;
+    }
+
+    /* Violet */
+    .blob-2 {
+      top: 20%;
+      right: -20%;
+      width: 40vw;
+      height: 40vw;
+      background: #06b6d4;
+      animation-delay: -5s;
+    }
+
+    /* Cyan */
+    .blob-3 {
+      bottom: -20%;
+      left: 20%;
+      width: 45vw;
+      height: 45vw;
+      background: #db2777;
+      animation-delay: -10s;
+    }
+
+    /* Pink */
+
+    .dark .blob-1 {
+      background: #4c1d95;
+    }
+
+    /* Deep Violet */
+    .dark .blob-2 {
+      background: #155e75;
+    }
+
+    /* Deep Cyan */
+    .dark .blob-3 {
+      background: #831843;
+    }
+
+    /* Deep Pink */
+
+
+    /* ===== TYPOGRAPHY UTILITIES ===== */
+    .text-glass-shadow {
+      text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
+    }
+
+    .dark .text-glass-shadow {
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+    }
+
+    /* ===== GLOBAL SCROLLBAR RESET ===== */
+    /* Hide ALL scrollbar elements on ALL elements to prevent faint/ghost scrollbars */
+    * {
+      scrollbar-width: none;
+      /* Firefox */
+    }
+
+    *::-webkit-scrollbar,
+    *::-webkit-scrollbar-track,
+    *::-webkit-scrollbar-thumb,
+    *::-webkit-scrollbar-corner,
+    *::-webkit-scrollbar-button {
+      display: none;
+      width: 0;
+      height: 0;
+      background: transparent;
+    }
+
+    /* ===== SCROLLBARS - STYLED FOR .code-scroll-area ONLY ===== */
+    /* Re-enable and style scrollbars ONLY on .code-scroll-area elements */
+    .code-scroll-area,
+    textarea {
+      /* scrollbar-gutter removed to prevent ghost tracks */
+      scrollbar-width: auto;
+      /* Firefox */
+      scrollbar-color: #8b5cf6 #cbd5e1;
+      /* Firefox: thumb track */
+    }
+
+    .dark .code-scroll-area,
+    .dark textarea {
+      scrollbar-color: #a78bfa #475569;
+      /* Firefox dark mode */
+    }
+
+    /* WebKit (Chrome, Edge, Safari) - SCOPED to .code-scroll-area only */
+    .code-scroll-area::-webkit-scrollbar {
+      display: block !important;
+      /* Override global reset */
+      width: 16px !important;
+      height: 16px !important;
+    }
+
+    .code-scroll-area::-webkit-scrollbar-track {
+      display: block !important;
+      background: #cbd5e1;
+      /* Slate-300 - matches arrow button background */
+    }
+
+    .dark .code-scroll-area::-webkit-scrollbar-track {
+      background: #475569;
+      /* Slate-600 - matches arrow button background */
+    }
+
+    .code-scroll-area::-webkit-scrollbar-thumb {
+      display: block !important;
+      background: #8b5cf6;
+      /* Solid Violet-500 */
+      border-radius: 8px;
+      border: 3px solid #cbd5e1;
+      min-height: 40px;
+      /* Ensure thumb is always grabbable */
+    }
+
+    .dark .code-scroll-area::-webkit-scrollbar-thumb {
+      background: #a78bfa;
+      /* Solid Violet-400 */
+      border: 3px solid #475569;
+    }
+
+    .code-scroll-area::-webkit-scrollbar-thumb:hover {
+      background: #7c3aed;
+      /* Solid Violet-600 */
+    }
+
+    .code-scroll-area::-webkit-scrollbar-corner {
+      display: block !important;
+      background: #cbd5e1;
+    }
+
+    .dark .code-scroll-area::-webkit-scrollbar-corner {
+      background: #475569;
+    }
+
+    /* ===== SCROLLBAR ARROW BUTTONS - SCOPED ===== */
+    .code-scroll-area::-webkit-scrollbar-button {
+      display: block !important;
+      background-color: #cbd5e1;
+      background-repeat: no-repeat;
+      background-position: center;
+      background-size: contain;
+    }
+
+    .dark .code-scroll-area::-webkit-scrollbar-button {
+      background-color: #475569;
+    }
+
+    /* Vertical scrollbar arrows */
+    .code-scroll-area::-webkit-scrollbar-button:single-button:vertical:decrement {
+      height: 16px;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%238b5cf6'%3E%3Cpath d='M8 4L2 12h12z'/%3E%3C/svg%3E");
+    }
+
+    .code-scroll-area::-webkit-scrollbar-button:single-button:vertical:increment {
+      height: 16px;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%238b5cf6'%3E%3Cpath d='M8 12L2 4h12z'/%3E%3C/svg%3E");
+    }
+
+    /* Horizontal scrollbar arrows */
+    .code-scroll-area::-webkit-scrollbar-button:single-button:horizontal:decrement {
+      width: 16px;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%238b5cf6'%3E%3Cpath d='M4 8l8-6v12z'/%3E%3C/svg%3E");
+    }
+
+    .code-scroll-area::-webkit-scrollbar-button:single-button:horizontal:increment {
+      width: 16px;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%238b5cf6'%3E%3Cpath d='M12 8l-8-6v12z'/%3E%3C/svg%3E");
+    }
+
+    /* Dark mode arrow colors */
+    .dark .code-scroll-area::-webkit-scrollbar-button:single-button:vertical:decrement {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23a78bfa'%3E%3Cpath d='M8 4L2 12h12z'/%3E%3C/svg%3E");
+    }
+
+    .dark .code-scroll-area::-webkit-scrollbar-button:single-button:vertical:increment {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23a78bfa'%3E%3Cpath d='M8 12L2 4h12z'/%3E%3C/svg%3E");
+    }
+
+    .dark .code-scroll-area::-webkit-scrollbar-button:single-button:horizontal:decrement {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23a78bfa'%3E%3Cpath d='M4 8l8-6v12z'/%3E%3C/svg%3E");
+    }
+
+    .dark .code-scroll-area::-webkit-scrollbar-button:single-button:horizontal:increment {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23a78bfa'%3E%3Cpath d='M12 8l-8-6v12z'/%3E%3C/svg%3E");
+    }
+
+    /* ===== NEON GLASSMORPHISM ===== */
+    .glass-pane {
+      background: rgba(240, 238, 255, 0.96);
+      /* Stronger Lavender Tint */
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(139, 92, 246, 0.2);
+    }
+
+    .dark .glass-pane {
+      background: rgba(30, 41, 59, 1.0);
+      /* Slate-800 - Solid, Professional */
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      /* Very subtle border */
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+
+    /* Neon Card with Glowing Border Effect */
+    .card-neon {
+      position: relative;
+      background: rgba(240, 238, 255, 0.96);
+      /* Stronger Lavender Tint */
+      backdrop-filter: blur(24px);
+      border-radius: 1rem;
+      border: 1px solid rgba(139, 92, 246, 0.2);
+      box-shadow: 0 4px 15px -3px rgba(124, 58, 237, 0.08), 0 2px 6px -2px rgba(124, 58, 237, 0.06);
+      overflow: hidden;
+    }
+
+    .dark .card-neon {
+      background: rgba(30, 41, 59, 1.0);
+      /* Slate-800 - Solid */
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+    }
+
+    /* The "Highlight" top border for cards */
+    .card-neon::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(139, 92, 246, 0.5), transparent);
+      opacity: 0.8;
+      pointer-events: none;
+    }
+
+    /* Keyframes for CSS animations (if not using Tailwind utility) */
+    @keyframes blob {
+      0% {
+        transform: translate(0px, 0px) scale(1);
+      }
+
+      33% {
+        transform: translate(30px, -50px) scale(1.1);
+      }
+
+      66% {
+        transform: translate(-20px, 20px) scale(0.9);
+      }
+
+      100% {
+        transform: translate(0px, 0px) scale(1);
+      }
+    }
+
+    /* Range Input */
+    input[type=range] {
+      -webkit-appearance: none;
+      appearance: none;
+      background: transparent;
+    }
+
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+    }
+
+    input[type=range]:focus {
+      outline: none;
+    }
+
+    /* ===== MONACO EDITOR SCROLLBAR OVERRIDES to match Global Theme ===== */
+    .monaco-editor .scrollbar .slider {
+      background: #8b5cf6 !important;
+      /* Thumb Background: Violet-500 */
+      border-radius: 8px !important;
+      border: 3px solid #cbd5e1 !important;
+      /* Thumb Border: Slate-300 */
+    }
+
+    .monaco-editor .scrollbar .slider:hover {
+      background: #7c3aed !important;
+      /* Violet-600 */
+    }
+
+    .dark .monaco-editor .scrollbar .slider {
+      background: #a78bfa !important;
+      /* Violet-400 */
+      border: 3px solid #475569 !important;
+      /* Slate-600 */
+    }
+
+    /* Track - Match global scrollbar track, NO BORDERS to avoid thin line */
+    .monaco-editor .scrollbar.vertical {
+      background: #cbd5e1 !important;
+      /* Track: Slate-300 - matches global ::-webkit-scrollbar-track */
+    }
+
+    .monaco-editor .scrollbar.horizontal {
+      background: #cbd5e1 !important;
+      /* Track: Slate-300 - matches global ::-webkit-scrollbar-track */
+    }
+
+    .dark .monaco-editor .scrollbar.vertical {
+      background: #475569 !important;
+      /* Track: Slate-600 - matches global dark mode */
+    }
+
+    .dark .monaco-editor .scrollbar.horizontal {
+      background: #475569 !important;
+      /* Track: Slate-600 - matches global dark mode */
+    }
+
+    /* Corner where scrollbars meet - match track color */
+    .monaco-scrollable-element>.corner {
+      background: #cbd5e1 !important;
+    }
+
+    .dark .monaco-scrollable-element>.corner {
+      background: #475569 !important;
+    }
+
+    /* Monaco internal scrollbars are HIDDEN via options in CodeEditor.tsx and DecodeView.tsx */
+    /* We use native scrollbar elements with .code-scroll-area class instead */
+    /* The following styles are disabled to prevent internal scrollbars from appearing */
+    /*
+    .monaco-scrollable-element>.scrollbar,
+    .monaco-scrollable-element>.scrollbar.fade,
+    .monaco-scrollable-element>.scrollbar.invisible {
+      opacity: 1 !important;
+      visibility: visible !important;
+      display: block !important;
+      pointer-events: auto !important;
+    }
+
+    .monaco-scrollable-element>.scrollbar.vertical {
+      width: 14px !important;
+    }
+
+    .monaco-scrollable-element>.scrollbar.horizontal {
+      height: 14px !important;
+    }
+
+    .monaco-scrollable-element>.scrollbar>.slider {
+      display: block !important;
+      visibility: visible !important;
+      opacity: 1 !important;
+    }
+
+    .monaco-scrollable-element>.scrollbar.invisible>.slider {
+      display: none !important;
+    }
+    */
+
+    /* EXTEND SCROLLBAR TO FULL WIDTH (Cover Margin) */
+
+    /* 1. Allow scrollbar to visually bleed out of the content area */
+    .monaco-scrollable-element {
+      overflow: visible !important;
+    }
+
+    /* 2. Define Track Colors & Force container styles */
+    .monaco-scrollable-element>.scrollbar.horizontal {
+      background: #f1f5f9 !important;
+      /* light: slate-100 match */
+      box-shadow: none !important;
+      left: 0 !important;
+      /* Try to pull left if possible, but pseudo handles the rest */
+      width: 100% !important;
+    }
+
+    .dark .monaco-scrollable-element>.scrollbar.horizontal {
+      background: #1e293b !important;
+      /* dark: slate-800 match */
+    }
+
+    /* 3. Use ::after (since ::before is used for arrows?) Wait, arrows use .scra::before. 
+       .scrollbar.horizontal itself is the track container. It is safe to use ::before on it.
+       Create the left extension. */
+    /* 3. Use ::after to create the left extension. */
+    .monaco-scrollable-element>.scrollbar.horizontal::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      right: 100%;
+      width: 100vw;
+      background: inherit;
+      pointer-events: auto;
+    }
+
+    /* 4. Fix Arrow & Slider Positioning/Styling */
+
+    /* Force Right Arrow to far Right */
+    .monaco-scrollable-element>.scrollbar.horizontal>.scra~.scra {
+      left: auto !important;
+      right: 0 !important;
+    }
+
+    /* Force Left Arrow to shift left over the gutter (margin) */
+    /* Assuming standard margin width ~65px. */
+    .monaco-scrollable-element>.scrollbar.horizontal>.scra {
+      left: -65px !important;
+    }
+
+    /* Ensure Right Arrow isn't affected by the above rule due to specificity or cascade, 
+       though ~ selector above handles it. To be safe, re-assert: */
+    .monaco-scrollable-element>.scrollbar.horizontal>.scra~.scra {
+      left: auto !important;
+    }
+
+    /* Color the Slider (Thumb) to match Arrows/Vertical Scrollbar */
+    .monaco-scrollable-element>.scrollbar>.slider {
+      background: #a78bfa !important;
+      /* Light mode violet */
+      border-radius: 4px;
+      /* Optional: softer look */
+    }
+
+    .dark .monaco-scrollable-element>.scrollbar>.slider {
+      background: #7c3aed !important;
+      /* Dark mode violet */
+    }
+
+    /* Debugger Styles for Monaco */
+    .debug-active-line {
+      background: rgba(37, 99, 235, 0.15);
+      border-left: 2px solid #3b82f6;
+    }
+
+    .dark .debug-active-line {
+      background: rgba(30, 64, 175, 0.3);
+      border-left: 2px solid #60a5fa;
+    }
+
+    .debug-glyph-arrow {
+      background: transparent;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .debug-glyph-arrow::after {
+      content: '→';
+      font-size: 24px;
+      font-weight: 900;
+      color: #3b82f6;
+      /* Blue-500 */
+      line-height: 1;
+      margin-left: 4px;
+    }
+
+    .dark .debug-glyph-arrow::after {
+      color: #60a5fa;
+      /* Blue-400 */
+    }
+
+    .debug-inline-values {
+      opacity: 0.6;
+      font-style: italic;
+      color: #94a3b8;
+      /* Slate-400 */
+      font-family: 'JetBrains Mono', monospace;
+      margin-left: 12px;
+    }
+
+    .dark .debug-inline-values {
+      color: #cbd5e1;
+      /* Slate-300 */
+    }
+
+    .monaco-editor .margin-view-overlays .current-line-margin {
+      border: none !important;
+    }
+  </style>
+
+</head>
+
+<body class="bg-background-light dark:bg-background-dark text-slate-800 dark:text-slate-200 h-screen overflow-hidden">
+  <div id="root" class="h-full"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+
+</html>
